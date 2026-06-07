@@ -1,102 +1,157 @@
-'use client';
+"use client";
 
-import { useState, useRef } from 'react';
-import Link from 'next/link';
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import {
-  Scan, ArrowRight, AlertCircle, ExternalLink, Download,
-  RotateCcw, CheckCircle2, Globe2, Clock, ChevronLeft,
-  Filter, SortAsc, Sparkles, FileText, FileJson,
-} from 'lucide-react';
-import Navbar from '@/components/layout/Navbar';
-import Footer from '@/components/layout/Footer';
-import BackgroundBlobs from '@/components/ui/BackgroundBlobs';
-import ScanLoader from '@/components/ui/ScanLoader';
-import ScoreRing from '@/components/ui/ScoreRing';
-import StatCard from '@/components/ui/StatCard';
-import IssueCard from '@/components/ui/IssueCard';
-import { runAudit } from '@/lib/api';
-import { downloadReportJSON, downloadReportTXT } from '@/lib/download';
-import { isValidUrl, formatDate, getScoreInfo, cn } from '@/lib/utils';
-import type { AuditReport, ImpactLevel } from '@/types/audit';
+  Scan,
+  ArrowRight,
+  AlertCircle,
+  ExternalLink,
+  Download,
+  RotateCcw,
+  CheckCircle2,
+  Globe2,
+  Clock,
+  ChevronLeft,
+  Filter,
+  SortAsc,
+  Sparkles,
+  FileText,
+  FileJson,
+  Volume2,
+  Square,
+} from "lucide-react";
+import Navbar from "@/components/layout/Navbar";
+import Footer from "@/components/layout/Footer";
+import BackgroundBlobs from "@/components/ui/BackgroundBlobs";
+import ScanLoader from "@/components/ui/ScanLoader";
+import ScoreRing from "@/components/ui/ScoreRing";
+import StatCard from "@/components/ui/StatCard";
+import IssueCard from "@/components/ui/IssueCard";
+import { runAudit } from "@/lib/api";
+import { downloadReportJSON, downloadReportTXT } from "@/lib/download";
+import { isValidUrl, formatDate, getScoreInfo, cn } from "@/lib/utils";
+import type { AuditReport, ImpactLevel } from "@/types/audit";
 
-type PageState = 'idle' | 'scanning' | 'results' | 'error';
+type PageState = "idle" | "scanning" | "results" | "error";
 
-const FILTER_OPTIONS: { label: string; value: ImpactLevel | 'all' }[] = [
-  { label: 'All Issues', value: 'all' },
-  { label: 'Critical', value: 'critical' },
-  { label: 'Serious', value: 'serious' },
-  { label: 'Moderate', value: 'moderate' },
-  { label: 'Minor', value: 'minor' },
+const FILTER_OPTIONS: { label: string; value: ImpactLevel | "all" }[] = [
+  { label: "All Issues", value: "all" },
+  { label: "Critical", value: "critical" },
+  { label: "Serious", value: "serious" },
+  { label: "Moderate", value: "moderate" },
+  { label: "Minor", value: "minor" },
 ];
 
 export default function AuditPage() {
-  const [url, setUrl] = useState('');
-  const [urlError, setUrlError] = useState('');
-  const [pageState, setPageState] = useState<PageState>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [url, setUrl] = useState("");
+  const [urlError, setUrlError] = useState("");
+  const [pageState, setPageState] = useState<PageState>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const [report, setReport] = useState<AuditReport | null>(null);
-  const [activeFilter, setActiveFilter] = useState<ImpactLevel | 'all'>('all');
+  const [activeFilter, setActiveFilter] = useState<ImpactLevel | "all">("all");
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   /* ── Handlers ────────────────────────────────────────────────────────────── */
+  function stopSpeaking() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
+  }
 
+  function handleSpeakSummary() {
+    if (!report?.aiSummary) return;
+
+    if (!("speechSynthesis" in window)) {
+      alert("Text-to-speech is not supported in this browser.");
+      return;
+    }
+
+    if (isSpeaking) {
+      stopSpeaking();
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(report.aiSummary);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
+  }
   function handleUrlChange(e: React.ChangeEvent<HTMLInputElement>) {
     setUrl(e.target.value);
-    if (urlError) setUrlError('');
+    if (urlError) setUrlError("");
   }
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();
+    stopSpeaking();
 
     // Validate URL
     const trimmed = url.trim();
     if (!trimmed) {
-      setUrlError('Please enter a URL to scan.');
+      setUrlError("Please enter a URL to scan.");
       inputRef.current?.focus();
       return;
     }
 
     // Auto-prepend https if missing
-    const fullUrl = trimmed.startsWith('http') ? trimmed : `https://${trimmed}`;
+    const fullUrl = trimmed.startsWith("http") ? trimmed : `https://${trimmed}`;
     if (!isValidUrl(fullUrl)) {
-      setUrlError('Please enter a valid URL (e.g. https://example.com).');
+      setUrlError("Please enter a valid URL (e.g. https://example.com).");
       return;
     }
 
     setUrl(fullUrl);
-    setPageState('scanning');
+    setPageState("scanning");
     setReport(null);
-    setErrorMessage('');
-    setActiveFilter('all');
+    setErrorMessage("");
+    setActiveFilter("all");
 
     try {
       const data = await runAudit(fullUrl);
       setReport(data);
-      setPageState('results');
+      setPageState("results");
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'An unexpected error occurred.');
-      setPageState('error');
+      setErrorMessage(
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      );
+      setPageState("error");
     }
   }
 
   function handleReset() {
-    setPageState('idle');
+    setPageState("idle");
     setReport(null);
-    setUrl('');
-    setUrlError('');
-    setErrorMessage('');
+    setUrl("");
+    setUrlError("");
+    setErrorMessage("");
     setTimeout(() => inputRef.current?.focus(), 100);
+    stopSpeaking();
   }
 
   /* ── Derived state ───────────────────────────────────────────────────────── */
 
-  const filteredIssues = report?.issues.filter(
-    (i) => activeFilter === 'all' || i.impact === activeFilter
-  ) ?? [];
+  const filteredIssues =
+    report?.issues.filter(
+      (i) => activeFilter === "all" || i.impact === activeFilter,
+    ) ?? [];
 
   const scoreInfo = report ? getScoreInfo(report.score) : null;
-
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+    };
+  }, []);
   /* ── Render ──────────────────────────────────────────────────────────────── */
 
   return (
@@ -106,18 +161,19 @@ export default function AuditPage() {
 
       <main className="relative z-10 min-h-screen pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-5xl mx-auto">
-
           {/* ── URL Input Form (always visible unless scanning) ─────────────── */}
-          {pageState !== 'scanning' && (
+          {pageState !== "scanning" && (
             <div className="mb-10">
               <div className="text-center mb-8">
                 <h1 className="font-display font-extrabold text-4xl sm:text-5xl text-white mb-3">
-                  {pageState === 'results' ? 'Audit Results' : 'Accessibility Audit'}
+                  {pageState === "results"
+                    ? "Audit Results"
+                    : "Accessibility Audit"}
                 </h1>
                 <p className="font-body text-slate-400 text-lg">
-                  {pageState === 'results'
-                    ? 'Here\'s your full accessibility report.'
-                    : 'Enter any website URL to get an instant AI-powered accessibility report.'}
+                  {pageState === "results"
+                    ? "Here's your full accessibility report."
+                    : "Enter any website URL to get an instant AI-powered accessibility report."}
                 </p>
               </div>
 
@@ -125,10 +181,12 @@ export default function AuditPage() {
               <form onSubmit={handleScan} noValidate>
                 <div
                   className={cn(
-                    'glass rounded-2xl border transition-all duration-300 overflow-hidden',
-                    urlError ? 'border-red-500/50' : 'border-white/[0.08] focus-within:border-brand-500/50'
+                    "glass rounded-2xl border transition-all duration-300 overflow-hidden",
+                    urlError
+                      ? "border-red-500/50"
+                      : "border-white/[0.08] focus-within:border-brand-500/50",
                   )}
-                  style={urlError ? {} : { boxShadow: 'none' }}
+                  style={urlError ? {} : { boxShadow: "none" }}
                 >
                   <div className="flex items-center gap-3 px-5 py-4">
                     <Globe2 className="w-5 h-5 text-slate-500 flex-shrink-0" />
@@ -140,7 +198,7 @@ export default function AuditPage() {
                       placeholder="https://example.com"
                       className="url-input flex-1 text-base"
                       aria-label="Website URL to audit"
-                      aria-describedby={urlError ? 'url-error' : undefined}
+                      aria-describedby={urlError ? "url-error" : undefined}
                       aria-invalid={!!urlError}
                       autoComplete="url"
                       autoFocus
@@ -152,13 +210,17 @@ export default function AuditPage() {
                     >
                       <Scan className="w-4 h-4" />
                       <span className="hidden sm:inline">
-                        {pageState === 'results' ? 'Re-scan' : 'Scan'}
+                        {pageState === "results" ? "Re-scan" : "Scan"}
                       </span>
                     </button>
                   </div>
                 </div>
                 {urlError && (
-                  <p id="url-error" role="alert" className="mt-2 text-red-400 text-sm font-body flex items-center gap-1.5">
+                  <p
+                    id="url-error"
+                    role="alert"
+                    className="mt-2 text-red-400 text-sm font-body flex items-center gap-1.5"
+                  >
                     <AlertCircle className="w-3.5 h-3.5" />
                     {urlError}
                   </p>
@@ -168,17 +230,27 @@ export default function AuditPage() {
           )}
 
           {/* ── Error State ─────────────────────────────────────────────────── */}
-          {pageState === 'error' && (
-            <div className="glass rounded-2xl border border-red-800/40 bg-red-950/20 p-10 text-center space-y-5" role="alert">
+          {pageState === "error" && (
+            <div
+              className="glass rounded-2xl border border-red-800/40 bg-red-950/20 p-10 text-center space-y-5"
+              role="alert"
+            >
               <div className="w-16 h-16 rounded-2xl bg-red-900/30 border border-red-700/40 flex items-center justify-center mx-auto">
                 <AlertCircle className="w-8 h-8 text-red-400" />
               </div>
               <div>
-                <h2 className="font-display font-bold text-white text-xl mb-2">Audit Failed</h2>
-                <p className="text-slate-400 font-body text-sm max-w-md mx-auto">{errorMessage}</p>
+                <h2 className="font-display font-bold text-white text-xl mb-2">
+                  Audit Failed
+                </h2>
+                <p className="text-slate-400 font-body text-sm max-w-md mx-auto">
+                  {errorMessage}
+                </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                <button onClick={handleScan as unknown as React.MouseEventHandler} className="btn-primary">
+                <button
+                  onClick={handleScan as unknown as React.MouseEventHandler}
+                  className="btn-primary"
+                >
                   <RotateCcw className="w-4 h-4" />
                   Try Again
                 </button>
@@ -188,23 +260,24 @@ export default function AuditPage() {
                 </button>
               </div>
               <p className="text-slate-600 text-xs font-body">
-                Make sure the backend is running at{' '}
-                <code className="font-mono text-slate-500">{process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}</code>
+                Make sure the backend is running at{" "}
+                <code className="font-mono text-slate-500">
+                  {process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000"}
+                </code>
               </p>
             </div>
           )}
 
           {/* ── Scanning State ──────────────────────────────────────────────── */}
-          {pageState === 'scanning' && (
+          {pageState === "scanning" && (
             <div className="glass rounded-2xl border border-white/[0.08]">
               <ScanLoader url={url} />
             </div>
           )}
 
           {/* ── Results ─────────────────────────────────────────────────────── */}
-          {pageState === 'results' && report && (
+          {pageState === "results" && report && (
             <div className="space-y-8 animate-fade-in">
-
               {/* Score overview card */}
               <div className="glass rounded-2xl border border-white/[0.08] overflow-hidden">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
@@ -221,7 +294,9 @@ export default function AuditPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <Globe2 className="w-4 h-4 text-slate-500" />
-                        <span className="font-body text-slate-400 text-xs uppercase tracking-wider">Audited URL</span>
+                        <span className="font-body text-slate-400 text-xs uppercase tracking-wider">
+                          Audited URL
+                        </span>
                       </div>
                       <a
                         href={report.url}
@@ -275,12 +350,31 @@ export default function AuditPage() {
                     {report.summary && (
                       <div className="flex flex-wrap gap-3 pt-1 text-xs font-mono">
                         {[
-                          { label: 'Passed', value: report.summary.passed, color: 'text-brand-400' },
-                          { label: 'Failed', value: report.summary.failed, color: 'text-red-400' },
-                          { label: 'Review', value: report.summary.needsReview, color: 'text-yellow-400' },
-                          { label: 'N/A', value: report.summary.notApplicable, color: 'text-slate-500' },
+                          {
+                            label: "Passed",
+                            value: report.summary.passed,
+                            color: "text-brand-400",
+                          },
+                          {
+                            label: "Failed",
+                            value: report.summary.failed,
+                            color: "text-red-400",
+                          },
+                          {
+                            label: "Review",
+                            value: report.summary.needsReview,
+                            color: "text-yellow-400",
+                          },
+                          {
+                            label: "N/A",
+                            value: report.summary.notApplicable,
+                            color: "text-slate-500",
+                          },
                         ].map((s) => (
-                          <span key={s.label} className="flex items-center gap-1">
+                          <span
+                            key={s.label}
+                            className="flex items-center gap-1"
+                          >
                             <span className={s.color}>{s.value}</span>
                             <span className="text-slate-600">{s.label}</span>
                           </span>
@@ -292,25 +386,50 @@ export default function AuditPage() {
               </div>
 
               {/* AI Summary */}
-              {report.aiSummary && (
-                <div className="glass rounded-2xl border border-brand-800/30 bg-brand-950/20 p-6">
-                  <div className="flex items-center gap-2.5 mb-3">
-                    <div className="w-8 h-8 rounded-lg bg-brand-500/20 border border-brand-500/30 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4 text-brand-400" />
-                    </div>
-                    <h2 className="font-display font-bold text-brand-300 text-base">AI Summary</h2>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-brand-500/20 border border-brand-500/30 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-brand-400" />
                   </div>
-                  <p className="font-body text-slate-300 leading-relaxed">{report.aiSummary}</p>
+                  <h2 className="font-display font-bold text-brand-300 text-base">
+                    AI Summary
+                  </h2>
                 </div>
-              )}
+
+                <button
+                  type="button"
+                  onClick={handleSpeakSummary}
+                  disabled={!report.aiSummary}
+                  className="btn-ghost text-xs px-3 py-2"
+                  aria-label={
+                    isSpeaking
+                      ? "Stop reading AI summary"
+                      : "Read AI summary aloud"
+                  }
+                >
+                  {isSpeaking ? (
+                    <>
+                      <Square className="w-3.5 h-3.5" />
+                      Stop
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 className="w-3.5 h-3.5" />
+                      Listen
+                    </>
+                  )}
+                </button>
+              </div>
 
               {/* Issues section */}
               <div>
                 {/* Issues header + filter + download */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
                   <h2 className="font-display font-bold text-white text-xl">
-                    Issues{' '}
-                    <span className="text-slate-500 font-normal text-base">({report.totalIssues})</span>
+                    Issues{" "}
+                    <span className="text-slate-500 font-normal text-base">
+                      ({report.totalIssues})
+                    </span>
                   </h2>
 
                   <div className="flex items-center gap-2 flex-wrap">
@@ -321,14 +440,14 @@ export default function AuditPage() {
                           key={opt.value}
                           onClick={() => setActiveFilter(opt.value)}
                           className={cn(
-                            'px-3 py-1.5 rounded-lg text-xs font-mono transition-all duration-200',
+                            "px-3 py-1.5 rounded-lg text-xs font-mono transition-all duration-200",
                             activeFilter === opt.value
-                              ? 'bg-brand-500/20 text-brand-300 border border-brand-500/30'
-                              : 'text-slate-500 hover:text-slate-300'
+                              ? "bg-brand-500/20 text-brand-300 border border-brand-500/30"
+                              : "text-slate-500 hover:text-slate-300",
                           )}
                         >
                           {opt.label}
-                          {opt.value !== 'all' && (
+                          {opt.value !== "all" && (
                             <span className="ml-1 opacity-60">
                               ({report[opt.value as ImpactLevel]})
                             </span>
@@ -351,14 +470,20 @@ export default function AuditPage() {
                       {showDownloadMenu && (
                         <div className="absolute right-0 top-full mt-2 glass rounded-xl border border-white/[0.08] shadow-card overflow-hidden z-20 w-44">
                           <button
-                            onClick={() => { downloadReportJSON(report); setShowDownloadMenu(false); }}
+                            onClick={() => {
+                              downloadReportJSON(report);
+                              setShowDownloadMenu(false);
+                            }}
                             className="w-full flex items-center gap-2.5 px-4 py-3 text-slate-300 hover:text-white hover:bg-white/05 text-xs font-body transition-colors"
                           >
                             <FileJson className="w-3.5 h-3.5 text-brand-400" />
                             Download JSON
                           </button>
                           <button
-                            onClick={() => { downloadReportTXT(report); setShowDownloadMenu(false); }}
+                            onClick={() => {
+                              downloadReportTXT(report);
+                              setShowDownloadMenu(false);
+                            }}
                             className="w-full flex items-center gap-2.5 px-4 py-3 text-slate-300 hover:text-white hover:bg-white/05 text-xs font-body transition-colors border-t border-white/[0.05]"
                           >
                             <FileText className="w-3.5 h-3.5 text-brand-400" />
@@ -374,15 +499,21 @@ export default function AuditPage() {
                 {report.totalIssues === 0 && (
                   <div className="glass rounded-2xl border border-brand-800/30 p-10 text-center space-y-3">
                     <CheckCircle2 className="w-12 h-12 text-brand-400 mx-auto" />
-                    <h3 className="font-display font-bold text-white text-lg">Outstanding Accessibility!</h3>
-                    <p className="font-body text-slate-400">No issues detected. This website is highly accessible.</p>
+                    <h3 className="font-display font-bold text-white text-lg">
+                      Outstanding Accessibility!
+                    </h3>
+                    <p className="font-body text-slate-400">
+                      No issues detected. This website is highly accessible.
+                    </p>
                   </div>
                 )}
 
                 {/* No results after filter */}
                 {report.totalIssues > 0 && filteredIssues.length === 0 && (
                   <div className="glass rounded-2xl border border-white/[0.06] p-8 text-center">
-                    <p className="text-slate-400 font-body">No {activeFilter} issues found.</p>
+                    <p className="text-slate-400 font-body">
+                      No {activeFilter} issues found.
+                    </p>
                   </div>
                 )}
 
@@ -390,7 +521,11 @@ export default function AuditPage() {
                 {filteredIssues.length > 0 && (
                   <div className="space-y-3">
                     {filteredIssues.map((issue, i) => (
-                      <IssueCard key={`${issue.id}-${i}`} issue={issue} index={i} />
+                      <IssueCard
+                        key={`${issue.id}-${i}`}
+                        issue={issue}
+                        index={i}
+                      />
                     ))}
                   </div>
                 )}
