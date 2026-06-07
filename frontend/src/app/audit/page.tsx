@@ -386,40 +386,45 @@ export default function AuditPage() {
               </div>
 
               {/* AI Summary */}
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-brand-500/20 border border-brand-500/30 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-brand-400" />
+              {report.aiSummary && (
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-brand-500/20 border border-brand-500/30 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-brand-400" />
+                    </div>
+                    <h2 className="font-display font-bold text-brand-300 text-base">
+                      AI Summary
+                    </h2>
                   </div>
-                  <h2 className="font-display font-bold text-brand-300 text-base">
-                    AI Summary
-                  </h2>
-                </div>
 
-                <button
-                  type="button"
-                  onClick={handleSpeakSummary}
-                  disabled={!report.aiSummary}
-                  className="btn-ghost text-xs px-3 py-2"
-                  aria-label={
-                    isSpeaking
-                      ? "Stop reading AI summary"
-                      : "Read AI summary aloud"
-                  }
-                >
-                  {isSpeaking ? (
-                    <>
-                      <Square className="w-3.5 h-3.5" />
-                      Stop
-                    </>
-                  ) : (
-                    <>
-                      <Volume2 className="w-3.5 h-3.5" />
-                      Listen
-                    </>
-                  )}
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={handleSpeakSummary}
+                    disabled={!report.aiSummary}
+                    className="btn-ghost text-xs px-3 py-2"
+                    aria-label={
+                      isSpeaking
+                        ? "Stop reading AI summary"
+                        : "Read AI summary aloud"
+                    }
+                  >
+                    {isSpeaking ? (
+                      <>
+                        <Square className="w-3.5 h-3.5" />
+                        Stop
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5" />
+                        Listen
+                      </>
+                    )}
+                  </button>
+                  <p className="font-body text-slate-300 leading-relaxed">
+                    {report.aiSummary}
+                  </p>
+                </div>
+              )}
 
               {/* Issues section */}
               <div>
