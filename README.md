@@ -80,7 +80,7 @@ The goal is not only to detect problems, but also to help developers understand 
 
 ---
 
-# 🏗️ Project Architecture
+
 
 ```txt
 Frontend (Next.js)
